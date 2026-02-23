@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>기억력 쑥쑥! 메모리 게임</title>
+    <h1>기억력 쑥쑥 게임</h1>
+    <p style="text-align: center; color: #555; margin-top: 0; margin-bottom: 20px; word-break: keep-all;">
+        처음에 2초간 나타나는 그림의 위치를 기억했다가, 같은 그림끼리 짝을 맞추는 두뇌 훈련 게임입니다.
+    </p>
     <style>
         :root {
             --bg-color: #f4f9f4;
@@ -283,12 +287,14 @@
             }
         }
 
-        function setupLevel() {
+function setupLevel() {
             levelDisplay.innerText = `현재 ${currentLevel}단계 진행 중`;
             board.innerHTML = '';
             flippedCards = [];
             matchedPairs = 0;
-            isLocked = false;
+            
+            // 🚨 처음에 카드를 보여주는 동안 사용자가 클릭하지 못하도록 잠금
+            isLocked = true; 
             
             let pairsCount;
             let columns;
@@ -318,6 +324,20 @@
                 cardElement.addEventListener('click', flipCard);
                 board.appendChild(cardElement);
             });
+
+            // 🌟 새로 추가된 '처음 2초간 힌트 보여주기' 로직 🌟
+            const allCardElements = document.querySelectorAll('.card');
+            
+            // 1. 카드가 화면에 깔리고 0.1초 뒤에 일제히 앞면으로 뒤집기 (부드러운 애니메이션을 위해)
+            setTimeout(() => {
+                allCardElements.forEach(card => card.classList.add('flipped'));
+            }, 100);
+
+            // 2. 2초(2000ms) 동안 보여준 뒤, 다시 뒷면으로 엎고 게임 시작(클릭 허용)
+            setTimeout(() => {
+                allCardElements.forEach(card => card.classList.remove('flipped'));
+                isLocked = false; // 이제 카드 클릭 가능!
+            }, 2100); 
         }
 
         function startTimer() {
