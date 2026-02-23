@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>기억력 쑥쑥! 메모리 게임</title>
+    <style>
+        :root {
+            --bg-color: #f4f9f4;
+            --primary-color: #4CAF50;
+            --card-bg: #ffffff;
+            --card-back: #81C784;
+            --text-color: #333333;
+        }
+
+        body {
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+            color: #2E7D32;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: white;
+            background-color: var(--primary-color);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: background-color 0.2s;
+        }
+
+        .btn:hover { background-color: #388E3C; }
+        .btn-reset { background-color: #E53935; }
+        .btn-reset:hover { background-color: #C62828; }
+
+        /* 게임 보드 */
+        #game-board {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 30px;
+            perspective: 1000px; /* 3D 효과를 위한 원근감 */
+        }
+
+        /* 카드 스타일 */
+        .card {
+            width: 80px;
+            height: 80px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.5s cubic-bezier(0.4, 0.2, 0.2, 1);
+            cursor: pointer;
+        }
+
+        @media (min-width: 400px) {
+            .card { width: 100px; height: 100px; }
+        }
+
+        .card.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem; /* 이모지 크기 */
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .card-front {
+            background-color: var(--card-bg);
+            transform: rotateY(180deg);
+            border: 3px solid #A5D6A7;
+        }
+
+        .card-back {
+            background-color: var(--card-back);
+            background-image: radial-gradient(#ffffff 10%, transparent 10%), radial-gradient(#ffffff 10%, transparent 10%);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+            border: 3px solid #4CAF50;
+        }
+
+        .matched .card-front {
+            background-color: #FFF9C4; /* 맞췄을 때 배경색 변화 */
+            border-color: #FBC02D;
+            transition: background-color 0.5s;
+        }
+
+        /* 성공 모달창 */
+        #modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .modal-content h2 { color: #E65100; margin-top: 0; }
+    </style>
+</head>
+<body>
+
+    <h1>기억력 쑥쑥 게임</h1>
+    
+    <div class="info-panel">
+        <span id="level-display">현재 단계: 1</span>
+        <button class="btn btn-reset" onclick="resetGame()">처음부터 다시</button>
+    </div>
+
+    <div id="game-board"></div>
+
+    <div id="modal">
+        <div class="modal-content">
+            <h2>참 잘하셨어요! 🎉</h2>
+            <p>모든 그림의 짝을 맞추셨습니다.</p>
+            <button class="btn" onclick="nextLevel()">다음 단계로 가기</button>
+        </div>
+    </div>
+
+    <script>
+        // 어르신들이 인지하기 쉬운 선명한 이모지 모음
+        const allEmojis = ['🍎', '🍌', '🍇', '🍉', '🍓', '🥕', '🌽', '🌻', '🐶', '🐱', '🐰', '🐟', '🚗', '🎈', '⏰', '☎️'];
+        
+        let currentLevel = 1;
+        let cards = [];
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let isLocked = false; // 애니메이션 중 클릭 방지
+
+        const board = document.getElementById('game-board');
+        const levelDisplay = document.getElementById('level-display');
+        const modal = document.getElementById('modal');
+
+        // 게임 초기화 및 로드
+        function initGame() {
+            // 저장된 난이도 불러오기 (없으면 1)
+            const savedLevel = localStorage.getItem('memoryGameLevel');
+            if (savedLevel) {
+                currentLevel = parseInt(savedLevel);
+            }
+            setupLevel();
+        }
+
+        // 레벨 설정 (단계별 카드 수 및 그리드 조정)
+        function setupLevel() {
+            levelDisplay.innerText = `현재 단계: ${currentLevel}`;
+            board.innerHTML = '';
+            flippedCards = [];
+            matchedPairs = 0;
+            isLocked = false;
+            modal.style.display = 'none';
+
+            let pairsCount;
+            let columns;
+
+            // 난이도 디자인
+            if (currentLevel === 1) { pairsCount = 2; columns = 2; } // 4장
+            else if (currentLevel === 2) { pairsCount = 3; columns = 3; } // 6장
+            else if (currentLevel === 3) { pairsCount = 4; columns = 4; } // 8장
+            else if (currentLevel === 4) { pairsCount = 6; columns = 4; } // 12장
+            else if (currentLevel >= 5) { pairsCount = 8; columns = 4; } // 16장 (최대치)
+
+            board.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+
+            // 카드 생성 및 섞기
+            let selectedEmojis = allEmojis.slice(0, pairsCount);
+            cards = [...selectedEmojis, ...selectedEmojis];
+            cards.sort(() => Math.random() - 0.5);
+
+            // 화면에 카드 배치
+            cards.forEach((emoji, index) => {
+                const cardElement = document.createElement('div');
+                cardElement.classList.add('card');
+                cardElement.dataset.emoji = emoji;
+                cardElement.dataset.index = index;
+
+                cardElement.innerHTML = `
+                    <div class="card-face card-front">${emoji}</div>
+                    <div class="card-face card-back"></div>
+                `;
+
+                cardElement.addEventListener('click', flipCard);
+                board.appendChild(cardElement);
+            });
+        }
+
+        // 카드 뒤집기 로직
+        function flipCard() {
+            if (isLocked) return;
+            if (this.classList.contains('flipped')) return;
+
+            this.classList.add('flipped');
+            flippedCards.push(this);
+
+            if (flippedCards.length === 2) {
+                checkForMatch();
+            }
+        }
+
+        // 짝 맞춤 확인
+        function checkForMatch() {
+            isLocked = true;
+            const [card1, card2] = flippedCards;
+
+            if (card1.dataset.emoji === card2.dataset.emoji) {
+                // 맞췄을 때
+                card1.classList.add('matched');
+                card2.classList.add('matched');
+                matchedPairs++;
+                flippedCards = [];
+                isLocked = false;
+
+                // 모든 카드를 맞췄다면
+                if (matchedPairs === cards.length / 2) {
+                    setTimeout(() => {
+                        modal.style.display = 'flex';
+                    }, 500);
+                }
+            } else {
+                // 틀렸을 때 (어르신들을 위해 1.2초 동안 충분히 보여줌)
+                setTimeout(() => {
+                    card1.classList.remove('flipped');
+                    card2.classList.remove('flipped');
+                    flippedCards = [];
+                    isLocked = false;
+                }, 1200);
+            }
+        }
+
+        // 다음 단계로
+        function nextLevel() {
+            if(currentLevel < 5) { // 최대 5단계 (원하시면 늘릴 수 있습니다)
+                currentLevel++;
+            }
+            localStorage.setItem('memoryGameLevel', currentLevel); // 난이도 저장
+            setupLevel();
+        }
+
+        // 처음부터 다시 (초기화)
+        function resetGame() {
+            if (confirm('정말로 데이터를 지우고 1단계부터 다시 시작하시겠습니까?')) {
+                currentLevel = 1;
+                localStorage.setItem('memoryGameLevel', currentLevel);
+                setupLevel();
+            }
+        }
+
+        // 게임 시작
+        initGame();
+    </script>
+</body>
+</html>
